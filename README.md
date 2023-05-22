@@ -301,9 +301,223 @@ created dist/lib.esm.js, dist/lib.umd.js in 4.1s
 
 ## ReactコンポーネントをHTMLページの一部として埋め込む
 
+動作確認用のhtmlファイルを格納するフォルダ`webroot`をルート直下に作成します
+
+```bash
+$ mkdir webroot
+$ touch webroot/test1.html
+```
+
+`test1.html`に下記内容を書き込みます
+`<div id="root"></div>`の部分に、Reactコンポーネント(`Counter`)を描画します
+
+```html
+<!DOCTYPE html>
+<html>
+  <body>
+    <h2>Webページの一部にReactコンポーネントを表示する</h2>
+    <div id="root"></div>
+  </body>
+  <script type="module">
+    import {ReactDOMClient, React, Counter} from '/dist/lib.esm.js';
+    const container = document.getElementById('root');
+    const root = ReactDOMClient.createRoot(container);
+    root.render(React.createElement(Counter));
+  </script>
+</html>
+```
+
+動作確認用Webサーバーを起動します
+
+```bash
+$ npx http-server .
+```
+`http://localhost:8080/webroot/test1.html`を開きます。htmlの一部としてReactコンポーネントが表示され、Countが増えることを確認します
+
+![img20](./img/img20.png)
 
 
 
+## Webページ側とReactコンポーネント間でやり取りを行う
+
+### Reactコンポーネントへの初期値設定
+
+Counterコンポーネントの属性(props)経由で初期値を設定することができます
+
+```typescript
+type propType = {
+  initVal?: number;
+};
+const Counter: FC<propType> = ({ initVal = 0 }) => {
+```
+
+`React.createElement()`の引数に、`initVal`を追加することで初期値を設定することができます
+
+
+
+* test2.html
+```html
+<!DOCTYPE html>
+<html>
+  <body>
+    <h2>Webページの一部にReactコンポーネントを表示する</h2>
+    <div id="root"></div>
+  </body>
+  <script type="module">
+    import {ReactDOMClient, React, Counter} from '/dist/lib.esm.js';
+    const container = document.getElementById('root');
+    const root = ReactDOMClient.createRoot(container);
+    root.render(React.createElement(Counter,{initVal:12}));
+  </script>
+</html>
+```
+![img30](./img/img30.png)
+
+
+
+### Reactコンポーネント側のイベント処理から、Webページ側の処理を呼び出す
+
+* propsにcallback関数を追加して、React側から呼び出す
+
+
+CallbackCounter.tsx
+```typescript
+import { FC, useState } from 'react';
+import styled from 'styled-components';
+const Content = styled.div`
+  border: solid 1px black;
+  width: fit-content;
+  padding: 4px;
+`;
+
+type propType = {
+  initVal?: number;
+  callback: (num: number) => number;
+};
+const CallbackCounter: FC<propType> = ({ initVal = 0, callback }) => {
+  const [count, setCount] = useState(initVal);
+  const handleClick = () => {
+    setCount((n) => n + 1);
+    if (callback) {
+      callback(count + 1);
+    }
+  };
+  return (
+    <Content>
+      <div>Count: {count}</div>
+      <button onClick={handleClick}>Increment</button>
+    </Content>
+  );
+};
+export default CallbackCounter;
+```
+
+```html
+  <body>
+    <h2>React側のイベントを、非SPAページ側に通知する</h2>
+    <p>
+      callback:<span id="callback">
+    </p>
+    <div id="root"></div>
+  </body>
+  <script type="module">
+    import {ReactDOMClient, React, CallbackCounter} from '/dist/lib.esm.js';
+    const $ = (selectors) => document.querySelector(selectors);
+    const root = ReactDOMClient.createRoot($('#root'));
+
+    root.render(
+      React.createElement(CallbackCounter,{
+        callback: (val)=> $('#callback').innerText = `${val}`}
+      )
+    );
+  </script>
+  ```
+
+
+### Webページ側のイベント処理から、React内部の処理を呼び出す
+
+* カスタムイベント経由で通知する
+
+EventReceiver.tsx
+```typescript
+import { useState, useEffect } from 'react';
+import styled from 'styled-components';
+
+// カスタムイベントの型設定
+declare global {
+  interface DocumentEventMap {
+    ButtonClick: CustomEvent<Date>;
+  }
+}
+
+const Content = styled.div`
+  border: solid 1px black;
+  width: fit-content;
+  padding: 4px;
+`;
+
+const formatDate = (date: Date) => {
+  return new Intl.DateTimeFormat('ja-jp', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(date);
+};
+
+const EventReceiver = () => {
+  const [log, setLog] = useState('');
+  useEffect(() => {
+    document.addEventListener('ButtonClick', appendEventLog);
+    return () => {
+      document.removeEventListener('ButtonClick', appendEventLog);
+    };
+  }, []);
+
+  function appendEventLog(data: CustomEvent<Date>) {
+    setLog((value) => value + formatDate(data.detail) + '\r\n');
+  }
+
+  return (
+    <Content>
+      <p>React Component</p>
+      <textarea value={log} style={{ height: '10em' }}></textarea>
+    </Content>
+  );
+};
+export default EventReceiver;
+
+```
+
+```html
+  <body>
+    <h2>Component外部のイベントを、React側に通知する</h2>
+    <p>
+      <button id="outerButton">クリックすると下記コンポーネントに時間を追記</button>
+    </p>
+    <div id="root"></div>
+    <hr />
+    <div>
+       <p><a href='/'>トップページへ戻る</a></p>
+    </div>
+  </body>
+  <script type="module">
+    import {ReactDOMClient, React, EventReceiver} from '/dist/lib.esm.js';
+    const $ = (selectors) => document.querySelector(selectors);
+    $('#outerButton').addEventListener('click', () => {
+        // イベントを配信
+        const event = new CustomEvent('ButtonClick', {detail: new Date()});
+        document.dispatchEvent(event);
+    });
+
+    const root = ReactDOMClient.createRoot($('#root'));
+    root.render(
+      React.createElement(EventReceiver)
+    );
+  </script>
+  ```
 ## 参考ページ
 
 * [既存のページに部分的にReactを導入する](https://minno.site/2021/02/13/%E6%97%A2%E5%AD%98%E3%81%AE%E3%83%9A%E3%83%BC%E3%82%B8%E3%81%AB%E9%83%A8%E5%88%86%E7%9A%84%E3%81%ABreact%E3%82%92%E5%B0%8E%E5%85%A5%E3%81%99%E3%82%8B/)

@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h2>Webページの一部にReactコンポーネントを表示する</h2>
+    <div id="root"></div>
+  </body>
+  <script type="module">
+    import {ReactDOMClient, React, Counter} from '/dist/lib.esm.js';
+    const container = document.getElementById('root');
+    const root = ReactDOMClient.createRoot(container);
+    root.render(React.createElement(Counter,{initVal:12}));
+  </script>
+</html>
