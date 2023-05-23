@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h2>React側のイベントをWebページ側に通知する</h2>
+    <p>
+      callback:<span id="callback">
+    </p>
+    <div id="root"></div>
+  </body>
+  <script src="/dist/lib.umd.js"></script>
+  <script>
+    const {ReactDOMClient, React, CallbackCounter} = MyBundle;
+    const $ = (selectors) => document.querySelector(selectors);
+    const root = ReactDOMClient.createRoot($('#root'));
+    root.render(
+      React.createElement(CallbackCounter,{
+        callback: (val)=> $('#callback').innerText = `${val}`}
+      )
+    );
+  </script>
+</html>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h2>Webページ側のイベントから、React側の処理を呼び出す</h2>
+    <p>
+      <button id="outerButton">クリックすると下記コンポーネントに時間を追記</button>
+    </p>
+    <div id="root"></div>
+  </body>
+  <script src="/dist/lib.umd.js"></script>
+  <script>
+    const {ReactDOMClient, React, EventReceiver} = MyBundle;
+    const $ = (selectors) => document.querySelector(selectors);
+    $('#outerButton').addEventListener('click', () => {
+        // イベントを配信
+        const event = new CustomEvent('ButtonClick', {detail: new Date()});
+        document.dispatchEvent(event);
+    });
+
+    const root = ReactDOMClient.createRoot($('#root'));
+    root.render(
+      React.createElement(EventReceiver)
+    );
+  </script>
+</html>

@@ -1,28 +1,28 @@
 # 従来型Webページの一部としてReactを埋め込む方法
 
 ## はじめに
-Reactのコンポーネントを従来型Webページの一部に組み込むことができないか？と思い調べてみましたが、意外にも具体的な手順が見つかりませんでした
+Reactのコンポーネントを従来型Webページの一部に組み込むにはどうすればいいのか？と思い調べてみましたが、意外にも具体的な手順が見つかりません
 
-そこで、下記3点に絞って手順をまとめました
+そこで、下記3点に絞って手順をまとめてみました
 
-1. Reactをコンポーネント単位で外部から利用できるようにビルドする手順
-2. WebページにReactコンポーネントを表示する手順
+1. Reactコンポーネントを外部から利用できるようにビルドする手順
+2. ReactのコンポーネントをWebページの一部として表示する手順
 3. Webページ側とReactコンポーネント間でやり取りを行う(初期値設定、相互の呼び出し)
 
 
 ### 概要
 
-1. Reactコンポーネントを外部から利用できるような形でビルド(rollup.jsを利用)する
+1. Reactコンポーネントを外部から利用できるようにビルド(rollup.jsを利用)する
     * 従来型Webアプリではモジュール形式のJSを利用してないことが多いので、UMD形式（グローバル変数経由でReactコンポーネントを公開）でビルドします
-    * 埋め込むコンポーネントはReactでおなじみの`Counter`コンポーネントをにご登場いただきます
-1. ビルドしたjsファイルをHTMLページで読み込み、Reactコンポーネントを画面の部品として表示する
+    * 埋め込むコンポーネントはReactでおなじみの`Counter`コンポーネントにご登場いただきます
+1. ReactのコンポーネントをWebページの一部として表示する
 1. Webページ側とReactコンポーネント間でやり取りを行う
     * Reactコンポーネントへの初期値設定
     * Reactコンポーネント側のイベント処理から、Webページ側の処理を呼び出す
     * Webページ側のイベント処理から、React内部の処理を呼び出す
 
 
-表示する`Counter`コンポーネント(初期値を引数で渡すことができるように変更済み)
+表示する`Counter`コンポーネント(引数で初期値を渡すことができるように変更済み)
 ```typescript
 const Counter: FC<propType> = ({ initVal = 0 }) => {
   const [count, setCount] = useState(initVal);
@@ -39,12 +39,14 @@ const Counter: FC<propType> = ({ initVal = 0 }) => {
 
 `Counter`コンポーネントを部品として表示するコード(のイメージ)
 
-* `MyBundle`はコンポーネントを公開するためのグローバル変数(UMD形式でビルドする際に、変数名を指定する)
+* `MyBundle`はコンポーネントを公開するためのグローバル変数(UMD形式でビルドする際に、指定した変数名)
+* `ReactDOMClient.createRoot()`で`root`を作成し、コンポーネントをrenderします
 ```html
   <body>
     <h2>Webページの一部にReactコンポーネントを表示する</h2>
     <div id="root"></div>
   </body>
+  <script src="/dist/lib.umd.js"></script>
   <script>
     const {ReactDOMClient, React, Counter} = MyBundle;
     const container = document.getElementById('root');
@@ -53,16 +55,16 @@ const Counter: FC<propType> = ({ initVal = 0 }) => {
   </script>
 ```
 
-## `Counter`コンポーネントの準備
+## 準備：`Counter`コンポーネントを作成
 
-* create-react-appでReactのフォルダを作成する
+* create-react-appでReactのひな形を作成ｓ
 
 ```bash
-npx create-react-app react-with-conventional-webapp --template typescript
-cd react-with-conventional-webapp
+$ npx create-react-app react-with-conventional-webapp --template typescript
+$ cd react-with-conventional-webapp
 ```
 
-* `styled-components`をインストール(コンポーネントの周りにborderを表示するだけのため)
+* `styled-components`をインストール(境界がわかるようにコンポーネントの周りにborderを表示するため)
 ```bash
 $ npm i styled-components@5.3.10
 
@@ -81,7 +83,7 @@ $ npm i -D @types/styled-components
 * `Counter`コンポーネント(ボタンを押すとカウントを加算)を追加
 
 ```bash
-touch ./src/Counter.tsx
+$ touch ./src/Counter.tsx
 ```
 
 Counter.tsx
@@ -135,28 +137,28 @@ export default App;
 ![img10](./img/img10.png)
 
 
-## Reactコンポーネントを外部から利用できるような形でビルド(rollup.jsを利用)する
+## ①Reactコンポーネントを外部から利用できるようにビルド(rollup.jsを利用)する
 
-ビルド用に
-  * rollup.jsの導入
+ビルドを行うための手順
+  * [rollup.js](https://rollupjs.org/)の導入
   * ビルド用スクリプト`rollup.config.js`の作成
-  * rollup.jsでトランスパイルを行うための設定ファイル`tsconfig.rollup.json`を追加
+  * [rollup.js](https://rollupjs.org/)でトランスパイルを行うための設定ファイル`tsconfig.rollup.json`を追加
   * `package.json`に設定(出力ファイル名)を追加
-  * ビルドのエントリーポイントとなる`src/lib.ts`で、公開するコンポーネントをexportする
-  * `package.json`の`scripts`にビルド用のコマンドを追加して動作確認
+  * ビルドのエントリーポイントファイル`src/lib.ts`で、公開するコンポーネントをexportする
+  * `package.json`の`scripts`にビルド用のコマンドを追加して動作確認を行う
 
 ### [rollup.js](https://rollupjs.org/)の導入
 
-ライブラリとしてパッケージングするため、[rollup.js](https://rollupjs.org/)を導入します。
+ライブラリとしてパッケージングするため、[rollup.js](https://rollupjs.org/)と必要なプラグインを導入します
 
-* [rollup.js](https://rollupjs.org/)は複数のモジュールやファイルを1つのファイルにまとめてくれる、軽量で高速なバンドルツールです。
+* [rollup.js](https://rollupjs.org/)は複数のモジュールやファイルを1つのファイルにまとめてくれる、軽量で高速なバンドルツールです
 
 ```bash
 npm i -D rollup rollup-plugin-delete rollup-plugin-peer-deps-external rollup-plugin-typescript2 @rollup/plugin-commonjs @rollup/plugin-node-resolve @rollup/plugin-replace
 ```
 
 ### ビルド用スクリプト`rollup.config.js`の作成
-続いて、ビルド用のスクリプトを作成します。rollup.config.jsをプロジェクトのルートに作成し、下記の内容を記載します
+続いて、ビルド用のスクリプトを作成します。`rollup.config.js`をプロジェクトのルートに作成し、下記の内容を記載します
 ```javascript
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import resolve from '@rollup/plugin-node-resolve';
@@ -199,18 +201,18 @@ export default {
   ],
 };
 ```
-* `input: 'src/lib.ts'`を起点にimportされているファイルを読み込み、バンドルします(1つのファイルにまとめる)。このファイルで、公開したいコンポーネントをexportします
+* `input: 'src/lib.ts'`を起点にimportされているファイルを読み込み、バンドルします(1つのファイルにまとめる)。このファイルで、このファイルで公開したいコンポーネントをexportします
 * 出力は`ES Modules`形式、`UMD`形式に分けて2ファイル出力します
 * `file:～`は出力するファイル名です。`package.json`に定義します（この後追加）
 
 * rollup.jsで利用するプラグインについて
   * peerDepsExternal：`package.json`に記載されたpeerDependenciesパッケージをバンドル対象から除外して、バンドルサイズを削減する
-  * resolve：他のモジュールをインポートにする際の依存関係の解決とファイルパスの特定を行う
+  * resolve：インポートするモジュールの依存関係の解決とファイルパスの特定を行う
   * commonjs：require()を解析してCommonJS形式の依存関係を特定する
-  * replace：環境変数をビルド時に置換する。実行時にnodeの環境変数を参照する箇所がエラーとなるのを回避する
-  * typescript：トランスパイルを行う。`tsconfig.rollup.json`を設定ファイルとして利用する。また、`useTsconfigDeclarationDir: true`を指定することで、型定義ファイル(d.ts)をtsconfigファイルの`declarationDir`に出力する
+  * replace：環境変数をビルド時に置換する。実行時にnodeの環境変数を参照する箇所がエラーとなるのでビルド時に置換する
+  * typescript：トランスパイルを行う。設定ファイルは`tsconfig.rollup.json`を利用する。また、`useTsconfigDeclarationDir: true`を指定することで、型定義ファイル(d.ts)をtsconfigファイルの`declarationDir`で指定されたフォルダに出力する
 
-### rollup.jsでトランスパイルを行うための設定ファイル`tsconfig.rollup.json`を追加
+### [rollup.js](https://rollupjs.org/)でトランスパイルを行うために必要な設定ファイル`tsconfig.rollup.json`を追加
 
 rollup.js用トランスパイル設定ファイル`tsconfig.rollup.json`をプロジェクトルートに作成します
 
@@ -260,11 +262,11 @@ rollup.jsで出力するファイル名の設定を追加します（ESModule用
 
 
 
-### ビルドのエントリーポイントとなる`src/lib.ts`で、公開するコンポーネントをexportする
+### ビルドのエントリーポイントファイル`src/lib.ts`で、公開するコンポーネントをexportする
 
 パッケージに公開するコンポーネント(関数)をexportします
 
-`Counter`だけではなく、`React`関連もexportして一緒にパッケージングします（別途読み込み不要になる)
+`Counter`だけではなく、`React`関連の処理も一緒にexportしてパッケージングします（別途読み込み不要になる）
 
 ```typescript
 export { default as React } from 'react';
@@ -286,7 +288,7 @@ export { default as Counter } from './Counter';
 ```
 
 ビルドでエラーが発生しないことを確認します
-* `dist/lib.esm.js, dist/lib.umd.js` の2ファイルが作成されます
+* エラーがなければ`dist/lib.esm.js, dist/lib.umd.js` の2ファイルが作成されます
 
 ```bash
 $ npm run build-lib
@@ -299,7 +301,7 @@ src/lib.ts → dist/lib.esm.js, dist/lib.umd.js...
 created dist/lib.esm.js, dist/lib.umd.js in 4.1s
 ```
 
-## ReactコンポーネントをHTMLページの一部として埋め込む
+## ②ReactのコンポーネントをWebページの一部として表示する
 
 動作確認用のhtmlファイルを格納するフォルダ`webroot`をルート直下に作成します
 
@@ -309,8 +311,41 @@ $ touch webroot/test1.html
 ```
 
 `test1.html`に下記内容を書き込みます
-`<div id="root"></div>`の部分に、Reactコンポーネント(`Counter`)を描画します
 
+* `<div id="root"></div>`の部分に、Reactコンポーネント(`Counter`)を描画する
+
+```html
+<!DOCTYPE html>
+<html>
+  <body>
+    <h2>Webページの一部にReactコンポーネントを表示する</h2>
+    <div id="root"></div>
+  </body>
+  <script src="/dist/lib.umd.js"></script>
+  <script>
+    const {ReactDOMClient, React, Counter} = MyBundle;
+    const container = document.getElementById('root');
+    const root = ReactDOMClient.createRoot(container);
+    root.render(React.createElement(Counter));
+  </script>
+</html>
+```
+
+
+動作確認のためにWebサーバーを起動します
+
+```bash
+$ npx http-server .
+```
+`http://localhost:8080/webroot/test1.html`を開きます。htmlの一部としてReactコンポーネントが表示され、Countが増えることを確認します
+
+![img20](./img/img20.png)
+
+
+
+* ESModule形式(lib.esm.js)を利用する場合は以下の記述になります
+
+test1_esm.html
 ```html
 <!DOCTYPE html>
 <html>
@@ -327,18 +362,8 @@ $ touch webroot/test1.html
 </html>
 ```
 
-動作確認用Webサーバーを起動します
 
-```bash
-$ npx http-server .
-```
-`http://localhost:8080/webroot/test1.html`を開きます。htmlの一部としてReactコンポーネントが表示され、Countが増えることを確認します
-
-![img20](./img/img20.png)
-
-
-
-## Webページ側とReactコンポーネント間でやり取りを行う
+## ③Webページ側とReactコンポーネント間でやり取りを行う
 
 ### Reactコンポーネントへの初期値設定
 
@@ -353,9 +378,9 @@ const Counter: FC<propType> = ({ initVal = 0 }) => {
 
 `React.createElement()`の引数に、`initVal`を追加することで初期値を設定することができます
 
+* PHPなどサーバ側から初期値をセットして表示することが可能です
 
-
-* test2.html
+test2.html
 ```html
 <!DOCTYPE html>
 <html>
@@ -377,7 +402,8 @@ const Counter: FC<propType> = ({ initVal = 0 }) => {
 
 ### Reactコンポーネント側のイベント処理から、Webページ側の処理を呼び出す
 
-* propsにcallback関数を追加して、React側から呼び出す
+
+propsにcallback関数を追加して、React側から呼び出せるように変更します
 
 
 CallbackCounter.tsx
@@ -412,31 +438,58 @@ const CallbackCounter: FC<propType> = ({ initVal = 0, callback }) => {
 export default CallbackCounter;
 ```
 
+CallbackCounterをexportします
+
+lib.ts
+```typescript
+export { default as React } from 'react';
+export { default as ReactDOM } from 'react-dom';
+export { default as ReactDOMClient } from 'react-dom/client';
+// Component
+export { default as Counter } from './Counter';
++ export { default as CallbackCounter } from './CallbackCounter';
+```
+
+
+test3.html
 ```html
+<!DOCTYPE html>
+<html>
   <body>
-    <h2>React側のイベントを、非SPAページ側に通知する</h2>
+    <h2>React側のイベントをWebページ側に通知する</h2>
     <p>
       callback:<span id="callback">
     </p>
     <div id="root"></div>
   </body>
-  <script type="module">
-    import {ReactDOMClient, React, CallbackCounter} from '/dist/lib.esm.js';
+  <script src="/dist/lib.umd.js"></script>
+  <script>
+    const {ReactDOMClient, React, CallbackCounter} = MyBundle;
     const $ = (selectors) => document.querySelector(selectors);
     const root = ReactDOMClient.createRoot($('#root'));
-
     root.render(
       React.createElement(CallbackCounter,{
         callback: (val)=> $('#callback').innerText = `${val}`}
       )
     );
   </script>
+</html>
+
   ```
 
+ボタンをクリックすると、callback関数が呼び出されて`callback:`の後ろのカウントが更新されます
+
+![img40](./img/img40.png)
 
 ### Webページ側のイベント処理から、React内部の処理を呼び出す
 
-* カスタムイベント経由で通知する
+Webページ側から、Reactの処理を呼び出すために[カスタムイベント](https://developer.mozilla.org/ja/docs/Web/Events/Creating_and_triggering_events)を利用します
+
+
+カスタムイベントを受信するコンポーネントを作成します
+
+* `ButtonClick`という名前のカスタムイベントを受信する
+* イベントのデータ(日時)を受け取り、yyyyMMdd HHmmss形式にフォーマットして表示する
 
 EventReceiver.tsx
 ```typescript
@@ -488,23 +541,36 @@ const EventReceiver = () => {
   );
 };
 export default EventReceiver;
-
 ```
 
+CallbackCounterをexportします
+
+lib.ts
+```typescript
+export { default as React } from 'react';
+export { default as ReactDOM } from 'react-dom';
+export { default as ReactDOMClient } from 'react-dom/client';
+// Component
+export { default as Counter } from './Counter';
+export { default as CallbackCounter } from './CallbackCounter';
+export { default as EventReceiver } from './EventReceiver';
+```
+
+
+test4.html
 ```html
+<!DOCTYPE html>
+<html>
   <body>
-    <h2>Component外部のイベントを、React側に通知する</h2>
+    <h2>Webページ側のイベントから、React側の処理を呼び出す</h2>
     <p>
-      <button id="outerButton">クリックすると下記コンポーネントに時間を追記</button>
+      callback:<span id="callback">
     </p>
     <div id="root"></div>
-    <hr />
-    <div>
-       <p><a href='/'>トップページへ戻る</a></p>
-    </div>
   </body>
-  <script type="module">
-    import {ReactDOMClient, React, EventReceiver} from '/dist/lib.esm.js';
+  <script src="/dist/lib.umd.js"></script>
+  <script>
+    const {ReactDOMClient, React, EventReceiver} = MyBundle;
     const $ = (selectors) => document.querySelector(selectors);
     $('#outerButton').addEventListener('click', () => {
         // イベントを配信
@@ -517,7 +583,15 @@ export default EventReceiver;
       React.createElement(EventReceiver)
     );
   </script>
-  ```
+</html>
+```
+
+ボタンをクリックすると、カスタムイベント経由でReactに現在時刻を渡して表示します
+
+![img50](./img/img50.png)
+
+
+
 ## 参考ページ
 
 * [既存のページに部分的にReactを導入する](https://minno.site/2021/02/13/%E6%97%A2%E5%AD%98%E3%81%AE%E3%83%9A%E3%83%BC%E3%82%B8%E3%81%AB%E9%83%A8%E5%88%86%E7%9A%84%E3%81%ABreact%E3%82%92%E5%B0%8E%E5%85%A5%E3%81%99%E3%82%8B/)
